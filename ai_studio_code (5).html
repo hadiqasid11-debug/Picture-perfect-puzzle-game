@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Picture Perfect Puzzle Game</title>
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #e0eafc 0%, #cfdef3 100%);
+            --accent: #6c5ce7;
+            --glass: rgba(255, 255, 255, 0.8);
+            --shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+        body {
+            background: var(--bg-gradient);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+            color: #2d3436;
+        }
+
+        /* UI Elements */
+        .header {
+            text-align: center;
+            padding: 20px;
+            width: 100%;
+        }
+
+        .header h1 { font-weight: 300; letter-spacing: 2px; margin-bottom: 5px; }
+        
+        .stats-bar {
+            display: flex;
+            gap: 20px;
+            background: var(--glass);
+            padding: 10px 30px;
+            border-radius: 50px;
+            box-shadow: var(--shadow);
+            margin-bottom: 20px;
+            backdrop-filter: blur(4px);
+        }
+
+        /* Game Board Layout */
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            max-width: 1000px;
+            width: 95%;
+        }
+
+        .main-stage {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        #puzzle-board {
+            display: grid;
+            background: rgba(0,0,0,0.05);
+            border: 4px solid white;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            position: relative;
+        }
+
+        .drop-slot {
+            border: 1px solid rgba(255,255,255,0.3);
+            background: rgba(255,255,255,0.1);
+        }
+
+        #pieces-tray {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            background: var(--glass);
+            padding: 20px;
+            border-radius: 15px;
+            min-width: 200px;
+            max-width: 400px;
+            min-height: 150px;
+            justify-content: center;
+            align-content: flex-start;
+            box-shadow: var(--shadow);
+        }
+
+        /* Puzzle Piece Styling */
+        .piece {
+            cursor: grab;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border-radius: 6px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            background-repeat: no-repeat;
+            touch-action: none;
+        }
+
+        .piece:active { cursor: grabbing; transform: scale(1.05); }
+
+        .piece.placed {
+            cursor: default;
+            box-shadow: none;
+            border-radius: 0;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        button {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 25px;
+            background: white;
+            color: var(--accent);
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        button:hover {
+            background: var(--accent);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        #hint-btn { background: #55efc4; color: #00b894; }
+        #hint-btn:hover { color: white; }
+
+        /* Modal Popup */
+        #success-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            backdrop-filter: blur(8px);
+        }
+
+        .modal-content {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            animation: pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes pop {
+            from { transform: scale(0.5); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .progress-container {
+            width: 300px;
+            height: 10px;
+            background: #eee;
+            border-radius: 5px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+
+        #progress-bar {
+            width: 0%;
+            height: 100%;
+            background: var(--accent);
+            transition: width 0.3s;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .main-stage { flex-direction: column; align-items: center; }
+            #puzzle-board { width: 300px !important; height: 300px !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Picture Perfect</h1>
+        <p>Relax and assemble the scenery</p>
+    </div>
+
+    <div class="stats-bar">
+        <span>Level: <b id="level-num">1</b></span>
+        <span>Moves: <b id="move-count">0</b></span>
+        <span>Time: <b id="timer">00:00</b></span>
+    </div>
+
+    <div class="game-container">
+        <div class="main-stage">
+            <div id="puzzle-board"></div>
+            <div id="pieces-tray"></div>
+        </div>
+
+        <div class="controls">
+            <button onclick="restartLevel()">Restart</button>
+            <button id="hint-btn" onclick="showHint()">Hint</button>
+        </div>
+        
+        <div class="progress-container">
+            <div id="progress-bar"></div>
+        </div>
+    </div>
+
+    <div id="success-modal">
+        <div class="modal-content">
+            <h2 style="font-size: 2rem; margin-bottom: 10px;">Picture Perfect! 🌿</h2>
+            <p id="level-stats"></p>
+            <button onclick="nextLevel()" style="margin-top: 20px; padding: 15px 40px; font-size: 1.1rem;">Next Landscape</button>
+        </div>
+    </div>
+
+    <script>
+        // Game Configuration
+        const levels = [
+            { id: 1, grid: 2, img: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=600&q=80' }, // Mountains
+            { id: 2, grid: 3, img: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80' }, // Beach
+            { id: 3, grid: 3, img: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=600&q=80' }, // Forest
+            { id: 4, grid: 4, img: 'https://images.unsplash.com/photo-1473580044384-7ba9967e16a0?auto=format&fit=crop&w=600&q=80' }, // Desert
+            { id: 5, grid: 4, img: 'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?auto=format&fit=crop&w=600&q=80' }, // City
+            { id: 6, grid: 5, img: 'https://images.unsplash.com/photo-1483921020237-2ff51e8e4b22?auto=format&fit=crop&w=600&q=80' }, // Snow
+            { id: 7, grid: 5, img: 'https://images.unsplash.com/photo-1522383225653-ed111181a951?auto=format&fit=crop&w=600&q=80' }  // Cherry Blossom
+        ];
+
+        let currentLevelIndex = 0;
+        let moves = 0;
+        let seconds = 0;
+        let timerInterval;
+        let boardSize = 400; // px
+
+        const board = document.getElementById('puzzle-board');
+        const tray = document.getElementById('pieces-tray');
+        const progressBar = document.getElementById('progress-bar');
+
+        // Initialization
+        function initGame() {
+            const level = levels[currentLevelIndex];
+            document.getElementById('level-num').innerText = level.id;
+            moves = 0;
+            seconds = 0;
+            document.getElementById('move-count').innerText = moves;
+            updateTimerDisplay();
+            clearInterval(timerInterval);
+            timerInterval = setInterval(updateTimer, 1000);
+
+            createBoard(level);
+            createPieces(level);
+            updateProgress();
+        }
+
+        function createBoard(level) {
+            board.innerHTML = '';
+            board.style.width = boardSize + 'px';
+            board.style.height = boardSize + 'px';
+            board.style.gridTemplateColumns = `repeat(${level.grid}, 1fr)`;
+
+            for (let i = 0; i < level.grid * level.grid; i++) {
+                const slot = document.createElement('div');
+                slot.classList.add('drop-slot');
+                slot.dataset.index = i;
+                
+                slot.addEventListener('dragover', e => e.preventDefault());
+                slot.addEventListener('drop', handleDrop);
+                
+                board.appendChild(slot);
+            }
+        }
+
+        function createPieces(level) {
+            tray.innerHTML = '';
+            let pieces = [];
+            const pSize = boardSize / level.grid;
+
+            for (let i = 0; i < level.grid * level.grid; i++) {
+                const piece = document.createElement('div');
+                piece.classList.add('piece');
+                piece.id = `piece-${i}`;
+                piece.draggable = true;
+                piece.style.width = pSize + 'px';
+                piece.style.height = pSize + 'px';
+                piece.style.backgroundImage = `url(${level.img})`;
+                
+                // Calculate background position
+                const row = Math.floor(i / level.grid);
+                const col = i % level.grid;
+                piece.style.backgroundPosition = `-${col * pSize}px -${row * pSize}px`;
+                piece.style.backgroundSize = `${boardSize}px ${boardSize}px`;
+
+                piece.addEventListener('dragstart', handleDragStart);
+                pieces.push(piece);
+            }
+
+            // Shuffle pieces
+            pieces.sort(() => Math.random() - 0.5);
+            pieces.forEach(p => tray.appendChild(p));
+        }
+
+        // Drag and Drop Logic
+        let draggedPiece = null;
+
+        function handleDragStart(e) {
+            draggedPiece = e.target;
+            e.dataTransfer.setData('text/plain', e.target.id);
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            const slot = e.target.closest('.drop-slot');
+            if (!slot || slot.hasChildNodes()) return;
+
+            const pieceId = e.dataTransfer.getData('text/plain');
+            const piece = document.getElementById(pieceId);
+            const pieceIndex = pieceId.split('-')[1];
+            const slotIndex = slot.dataset.index;
+
+            // Correct placement logic
+            if (pieceIndex === slotIndex) {
+                slot.appendChild(piece);
+                piece.classList.add('placed');
+                piece.draggable = false;
+                moves++;
+                document.getElementById('move-count').innerText = moves;
+                checkWin();
+                updateProgress();
+            } else {
+                // Shake effect for wrong placement
+                slot.style.background = "rgba(255, 0, 0, 0.2)";
+                setTimeout(() => slot.style.background = "rgba(255,255,255,0.1)", 300);
+                moves++;
+                document.getElementById('move-count').innerText = moves;
+            }
+        }
+
+        // Gameplay Functions
+        function updateTimer() {
+            seconds++;
+            updateTimerDisplay();
+        }
+
+        function updateTimerDisplay() {
+            const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const secs = (seconds % 60).toString().padStart(2, '0');
+            document.getElementById('timer').innerText = `${mins}:${secs}`;
+        }
+
+        function updateProgress() {
+            const level = levels[currentLevelIndex];
+            const total = level.grid * level.grid;
+            const placed = board.querySelectorAll('.placed').length;
+            const percentage = (placed / total) * 100;
+            progressBar.style.width = percentage + '%';
+        }
+
+        function showHint() {
+            const level = levels[currentLevelIndex];
+            const piecesInTray = Array.from(tray.querySelectorAll('.piece'));
+            if (piecesInTray.length === 0) return;
+
+            const firstPiece = piecesInTray[0];
+            const correctIndex = firstPiece.id.split('-')[1];
+            const targetSlot = board.querySelector(`[data-index="${correctIndex}"]`);
+
+            // Visual guide
+            targetSlot.style.background = "rgba(85, 239, 196, 0.4)";
+            setTimeout(() => targetSlot.style.background = "rgba(255,255,255,0.1)", 1500);
+        }
+
+        function checkWin() {
+            const level = levels[currentLevelIndex];
+            const placed = board.querySelectorAll('.placed').length;
+            if (placed === level.grid * level.grid) {
+                clearInterval(timerInterval);
+                showSuccess();
+            }
+        }
+
+        function showSuccess() {
+            const modal = document.getElementById('success-modal');
+            const stats = document.getElementById('level-stats');
+            stats.innerText = `Completed in ${moves} moves and ${document.getElementById('timer').innerText}!`;
+            modal.style.display = 'flex';
+        }
+
+        function nextLevel() {
+            document.getElementById('success-modal').style.display = 'none';
+            if (currentLevelIndex < levels.length - 1) {
+                currentLevelIndex++;
+                initGame();
+            } else {
+                alert("Congratulations! You've completed all scenic landscapes. 🌿");
+                currentLevelIndex = 0;
+                initGame();
+            }
+        }
+
+        function restartLevel() {
+            if(confirm("Restart this level? Progress will be lost.")) {
+                initGame();
+            }
+        }
+
+        // Start Game
+        window.onload = initGame;
+    </script>
+</body>
+</html>
